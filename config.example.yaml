@@ -1,0 +1,34 @@
+# Copy this file to config.yaml and adjust as needed.
+# config.yaml is gitignored - it's fine to put non-secret settings here.
+# The Elasticsearch API key itself is NOT read from this file - see README.md
+# (it's read from the DNS_REPORT_ES_API_KEY environment variable instead).
+
+elasticsearch:
+  host: "https://192.168.1.160:9200"
+  index_pattern: "logs-zeek-so*"
+  verify_tls: false          # so1 uses a self-signed cert
+  request_timeout_sec: 30
+
+dns:
+  local_subnet: "192.168.1.0/24"
+  # Your authoritative/authorized local resolvers (ns1, ns2).
+  authorized_servers:
+    - 192.168.1.248   # ns1
+    - 192.168.1.249   # ns2
+
+report:
+  lookback_hours: 24
+  output_dir: "/var/www/html/dns_report"
+  # How many distinct clients / resolved IPs to pull per report (plenty for a home LAN).
+  max_clients: 500
+  max_resolved_ips_per_client: 200
+
+ip_enrichment:
+  # "ipinfo" is the only service implemented right now.
+  service: "ipinfo"
+  # Optional ipinfo.io token. Leave blank to use their free/anonymous tier.
+  # If you do get a token, put it in the DNS_REPORT_IPINFO_TOKEN env var instead
+  # of here, so it never ends up committed to git.
+  cache_file: "ip_cache.json"
+  # Skip re-querying an IP we've already enriched within this many days.
+  cache_ttl_days: 30

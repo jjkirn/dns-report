@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DNS Usage Report - {{ report_date }}</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 2em; color: #222; background: #fafafa; }
+  h1 { margin-bottom: 0.1em; }
+  .subtitle { color: #666; margin-bottom: 1.5em; }
+  h2 { border-bottom: 2px solid #ddd; padding-bottom: 0.3em; margin-top: 2em; }
+  .note { color: #666; font-size: 0.9em; margin-bottom: 1em; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 1em; background: #fff; }
+  th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; vertical-align: top; font-size: 0.92em; }
+  th { background: #eee; }
+  tr:nth-child(even) { background: #f6f6f6; }
+  .client { font-weight: bold; }
+  .bypass-row { background: #fff3f0 !important; }
+  .ip-list { margin: 0; padding-left: 1.1em; }
+  .ip-list li { margin-bottom: 0.4em; }
+  .org { color: #555; }
+  .geo { color: #888; font-size: 0.85em; }
+  .lookup-link { font-size: 0.85em; }
+  .empty { color: #888; font-style: italic; }
+  .count-badge { background: #eef; border-radius: 3px; padding: 1px 6px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<h1>DNS Usage Report</h1>
+<div class="subtitle">{{ report_date }} &middot; last {{ lookback_hours }}h &middot; local DNS servers: {{ authorized_servers | join(", ") }}</div>
+
+<h2>Report A &mdash; Hosts using ns1/ns2</h2>
+<div class="note">LAN hosts in {{ local_subnet }} that queried your local DNS servers, and what internet addresses those lookups resolved to.</div>
+{% if report_a %}
+<table>
+<tr><th>Client</th><th>Server(s) used</th><th>Queries</th><th>Last seen</th><th>Sample query names</th><th>Resolved IPs (enriched)</th></tr>
+{% for c in report_a %}
+<tr>
+  <td class="client">{{ c.client_ip }}</td>
+  <td>{{ c.servers | join(", ") }}</td>
+  <td><span class="count-badge">{{ c.query_count }}</span></td>
+  <td>{{ c.last_seen }}</td>
+  <td>{{ c.query_names[:5] | join(", ") }}{% if c.query_names|length > 5 %} &hellip;{% endif %}</td>
+  <td>
+    {% if c.enriched %}
+    <ul class="ip-list">
+    {% for e in c.enriched %}
+      <li>
+        <strong>{{ e.ip }}</strong>
+        {% if e.org %}<span class="org"> &mdash; {{ e.org }}</span>{% endif %}
+        {% if e.city or e.country %}<div class="geo">{{ [e.city, e.region, e.country] | select | join(", ") }}</div>{% endif %}
+        <div class="lookup-link"><a href="https://ipinfo.io/{{ e.ip }}" target="_blank" rel="noopener">more info &rarr;</a></div>
+      </li>
+    {% endfor %}
+    </ul>
+    {% else %}<span class="empty">no public IPs resolved</span>{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p class="empty">No activity in this window.</p>
+{% endif %}
+
+<h2>Report B &mdash; Hosts bypassing ns1/ns2</h2>
+<div class="note">LAN hosts in {{ local_subnet }} that queried a DNS server OTHER than ns1/ns2 (ns1/ns2's own upstream forwarder lookups are excluded from this list).</div>
+{% if report_b %}
+<table>
+<tr><th>Client</th><th>DNS server(s) used instead</th><th>Queries</th><th>Last seen</th><th>Sample query names</th><th>Resolved IPs (enriched)</th></tr>
+{% for c in report_b %}
+<tr class="bypass-row">
+  <td class="client">{{ c.client_ip }}</td>
+  <td>{{ c.servers | join(", ") }}</td>
+  <td><span class="count-badge">{{ c.query_count }}</span></td>
+  <td>{{ c.last_seen }}</td>
+  <td>{{ c.query_names[:5] | join(", ") }}{% if c.query_names|length > 5 %} &hellip;{% endif %}</td>
+  <td>
+    {% if c.enriched %}
+    <ul class="ip-list">
+    {% for e in c.enriched %}
+      <li>
+        <strong>{{ e.ip }}</strong>
+        {% if e.org %}<span class="org"> &mdash; {{ e.org }}</span>{% endif %}
+        {% if e.city or e.country %}<div class="geo">{{ [e.city, e.region, e.country] | select | join(", ") }}</div>{% endif %}
+        <div class="lookup-link"><a href="https://ipinfo.io/{{ e.ip }}" target="_blank" rel="noopener">more info &rarr;</a></div>
+      </li>
+    {% endfor %}
+    </ul>
+    {% else %}<span class="empty">no public IPs resolved</span>{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p class="empty">No bypass DNS activity in this window.</p>
+{% endif %}
+
+<p class="note">Generated {{ generated_at }} by dns-report.</p>
+</body>
+</html>

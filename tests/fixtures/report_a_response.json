@@ -1,0 +1,24 @@
+{
+  "aggregations": {
+    "by_client": {
+      "buckets": [
+        {
+          "key": "192.168.1.141",
+          "doc_count": 342,
+          "by_server": {"buckets": [{"key": "192.168.1.248"}]},
+          "resolved_ips": {"buckets": [{"key": "142.251.215.142"}, {"key": "13.107.42.14"}]},
+          "query_names": {"buckets": [{"key": "update.googleapis.com"}, {"key": "outlook.office.com"}]},
+          "last_seen": {"value_as_string": "2026-11-06T22:10:00.000Z"}
+        },
+        {
+          "key": "192.168.1.130",
+          "doc_count": 118,
+          "by_server": {"buckets": [{"key": "192.168.1.249"}]},
+          "resolved_ips": {"buckets": [{"key": "140.82.112.3"}]},
+          "query_names": {"buckets": [{"key": "github.com"}]},
+          "last_seen": {"value_as_string": "2026-11-06T21:55:00.000Z"}
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "aggregations": {
+    "by_client": {
+      "buckets": [
+        {
+          "key": "192.168.1.88",
+          "doc_count": 7,
+          "by_server": {"buckets": [{"key": "1.1.1.1"}]},
+          "resolved_ips": {"buckets": [{"key": "104.16.123.96"}]},
+          "query_names": {"buckets": [{"key": "example.com"}]},
+          "last_seen": {"value_as_string": "2026-11-06T20:02:00.000Z"}
+        }
+      ]
+    }
+  }
+}
