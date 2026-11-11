@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>DNS Usage Report - {{ report_date }}</title>
+<title>DNS Bypass Report - {{ report_date }}</title>
 <style>
   body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 2em; color: #222; background: #fafafa; }
   h1 { margin-bottom: 0.1em; }
@@ -25,43 +25,8 @@
 </style>
 </head>
 <body>
-<h1>DNS Usage Report</h1>
+<h1>DNS Bypass Report</h1>
 <div class="subtitle">{{ report_date }} &middot; last {{ lookback_hours }}h &middot; local DNS servers: {{ authorized_servers | join(", ") }}</div>
-
-<h2>Report A &mdash; Hosts using ns1/ns2</h2>
-<div class="note">LAN hosts in {{ local_subnet }} that queried your local DNS servers, and what internet addresses those lookups resolved to.</div>
-{% if report_a %}
-<table>
-<tr><th>Client</th><th>Server(s) used</th><th>Queries</th><th>Last seen</th><th>Sample query names</th><th>Resolved IPs (enriched)</th></tr>
-{% for c in report_a %}
-<tr>
-  <td class="client">{{ c.client_ip }}</td>
-  <td>{{ c.servers | join(", ") }}</td>
-  <td><span class="count-badge">{{ c.query_count }}</span></td>
-  <td>{{ c.last_seen }}</td>
-  <td>{{ c.query_names[:5] | join(", ") }}{% if c.query_names|length > 5 %} &hellip;{% endif %}</td>
-  <td>
-    {% if c.enriched %}
-    <ul class="ip-list">
-    {% for e in c.enriched %}
-      <li>
-        <strong>{{ e.ip }}</strong>
-        {% if e.org %}<span class="org"> &mdash; {{ e.org }}</span>{% endif %}
-        {% if e.city or e.country %}<div class="geo">{{ [e.city, e.region, e.country] | select | join(", ") }}</div>{% endif %}
-        <div class="lookup-link"><a href="https://ipinfo.io/{{ e.ip }}" target="_blank" rel="noopener">more info &rarr;</a></div>
-      </li>
-    {% endfor %}
-    </ul>
-    {% else %}<span class="empty">no public IPs resolved</span>{% endif %}
-  </td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p class="empty">No activity in this window.</p>
-{% endif %}
-
-<h2>Report B &mdash; Hosts bypassing ns1/ns2</h2>
 <div class="note">LAN hosts in {{ local_subnet }} that queried a DNS server OTHER than ns1/ns2 (ns1/ns2's own upstream forwarder lookups are excluded from this list).</div>
 {% if report_b %}
 <table>

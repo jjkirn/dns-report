@@ -131,7 +131,16 @@ class TestIPEnricher(unittest.TestCase):
 
 class TestEndToEndRender(unittest.TestCase):
     """Confirms report building + HTML rendering works end-to-end against
-    fixtures, including the ns1-forwarding-upstream edge case being excluded."""
+    fixtures, including the ns1-forwarding-upstream edge case being excluded.
+
+    Note: "Report A" (which hosts used ns1/ns2) was dropped from dns_report.py
+    on 2026-11-10 - it was structurally unreliable because Security Onion's
+    Zeek sensor only sees traffic that crosses the switch's SPAN-mirrored
+    uplink port, and intra-LAN traffic to ns1/ns2 never does. The report_a
+    fixture/query builder are kept around in es_client.py (still unit-tested
+    above) in case this is ever revisited via a different data source (e.g.
+    BIND9 query logs), but dns_report.py itself now only builds the bypass
+    report (formerly "Report B")."""
 
     @patch("ip_enrich.requests.get")
     def test_full_pipeline_renders_html(self, mock_get):
@@ -141,29 +150,26 @@ class TestEndToEndRender(unittest.TestCase):
                                         "region": "TS", "country": "US", "hostname": ""}
         mock_get.return_value = mock_resp
 
-        report_a = es_client.parse_client_buckets(load_fixture("report_a_response.json"))
         report_b = es_client.parse_client_buckets(load_fixture("report_b_response.json"))
 
         tmpdir = tempfile.mkdtemp()
         enricher = ip_enrich.IPEnricher(os.path.join(tmpdir, "cache.json"))
-        dns_report.enrich_clients(report_a, enricher)
         dns_report.enrich_clients(report_b, enricher)
 
         cfg = {
             "report": {"lookback_hours": 24},
             "dns": {"local_subnet": LOCAL_SUBNET, "authorized_servers": AUTHORIZED},
         }
-        html = dns_report.render_html(report_a, report_b, cfg)
+        html = dns_report.render_html(report_b, cfg)
 
-        self.assertIn("192.168.1.141", html)
         self.assertIn("192.168.1.88", html)
-        self.assertIn("Report A", html)
-        self.assertIn("Report B", html)
+        self.assertIn("DNS Bypass Report", html)
+        self.assertNotIn("Report A", html)
         # The upstream-forwarder edge case (ns1/ns2 themselves as source) must
-        # never appear as a "client" in either report - check at the data
-        # level, since ns1/ns2's IPs legitimately appear in the "server used"
-        # column and would make a raw HTML substring check unreliable.
-        client_ips = {c["client_ip"] for c in report_a} | {c["client_ip"] for c in report_b}
+        # never appear as a "client" - check at the data level, since ns1/ns2's
+        # IPs legitimately appear in the "server used" column and would make a
+        # raw HTML substring check unreliable.
+        client_ips = {c["client_ip"] for c in report_b}
         self.assertFalse(client_ips & set(AUTHORIZED))
 
 

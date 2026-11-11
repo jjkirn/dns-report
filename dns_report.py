@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-"""Daily DNS usage report for the home LAN, built from Security Onion's
+"""Daily DNS bypass report for the home LAN, built from Security Onion's
 Zeek dns.log (via Elasticsearch).
 
-Produces two sections:
-  A. Which LAN hosts used the authorized local DNS servers (ns1/ns2),
-     and what internet IPs those queries resolved to (enriched via ipinfo.io).
-  B. Which LAN hosts queried some OTHER DNS server instead (bypassing
-     ns1/ns2), same enrichment.
+Reports which LAN hosts queried a DNS server OTHER than the authorized
+local servers (ns1/ns2), and what internet IPs those queries resolved to
+(enriched via ipinfo.io).
+
+Note: this report used to also include a "Report A" section (which hosts
+DID use ns1/ns2) - that section was dropped on 2026-11-10. It turned out
+to be structurally unreliable: Security Onion's Zeek sensor only sees
+traffic that crosses the switch's SPAN-mirrored uplink port, and a LAN
+client talking to ns1/ns2 (also on the local LAN) never needs to cross
+that port, so it was invisible to Zeek regardless of actual usage. Fixing
+it would require either reconfiguring the switch's SPAN session or reading
+BIND9's own query logs directly - neither was judged worth it, since the
+real threat-detection value (catching connections/resolutions touching a
+known-bad IP/domain) is already covered by the separate so-intel-feed/
+intel-report project, which works regardless of which DNS server was used.
 
 Usage:
     python3 dns_report.py [--config config.yaml] [--out-name dns_report.html]
@@ -22,9 +32,7 @@ import sys
 from jinja2 import Environment, FileSystemLoader
 
 from config import load_config, ConfigError, die
-from es_client import (
-    ESClient, query_authorized_dns_usage, query_bypass_dns_usage, parse_client_buckets,
-)
+from es_client import ESClient, query_bypass_dns_usage, parse_client_buckets
 from ip_enrich import IPEnricher
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,18 +64,13 @@ def build_report(cfg):
     max_clients = cfg["report"]["max_clients"]
     max_ips = cfg["report"]["max_resolved_ips_per_client"]
 
-    resp_a = query_authorized_dns_usage(
-        es, local_subnet, authorized, lookback_hours, max_clients, max_ips
-    )
     resp_b = query_bypass_dns_usage(
         es, local_subnet, authorized, lookback_hours, max_clients, max_ips
     )
 
-    report_a = parse_client_buckets(resp_a)
     report_b = parse_client_buckets(resp_b)
 
     # Sort busiest clients first - most useful at a glance.
-    report_a.sort(key=lambda c: c["query_count"], reverse=True)
     report_b.sort(key=lambda c: c["query_count"], reverse=True)
 
     enricher = IPEnricher(
@@ -75,14 +78,13 @@ def build_report(cfg):
         token=cfg["_ipinfo_token"],
         ttl_days=cfg["ip_enrichment"].get("cache_ttl_days", 30),
     )
-    enrich_clients(report_a, enricher)
     enrich_clients(report_b, enricher)
     enricher.save()
 
-    return report_a, report_b
+    return report_b
 
 
-def render_html(report_a, report_b, cfg):
+def render_html(report_b, cfg):
     env = Environment(loader=FileSystemLoader(os.path.join(SCRIPT_DIR, "templates")))
     tpl = env.get_template("report.html.j2")
     now = datetime.datetime.now()
@@ -92,7 +94,6 @@ def render_html(report_a, report_b, cfg):
         lookback_hours=cfg["report"]["lookback_hours"],
         local_subnet=cfg["dns"]["local_subnet"],
         authorized_servers=cfg["dns"]["authorized_servers"],
-        report_a=report_a,
         report_b=report_b,
     )
 
@@ -110,11 +111,11 @@ def main():
         die(str(e))
 
     try:
-        report_a, report_b = build_report(cfg)
+        report_b = build_report(cfg)
     except Exception as e:
         die(f"Failed to build report: {e}")
 
-    html = render_html(report_a, report_b, cfg)
+    html = render_html(report_b, cfg)
 
     out_dir = cfg["report"]["output_dir"]
     os.makedirs(out_dir, exist_ok=True)
@@ -132,8 +133,7 @@ def main():
 
     print(f"Wrote {out_path}")
     print(f"Wrote {latest_path}")
-    print(f"Report A (ns1/ns2 users): {len(report_a)} client(s)")
-    print(f"Report B (bypass DNS users): {len(report_b)} client(s)")
+    print(f"Bypass DNS users: {len(report_b)} client(s)")
     if report_b:
         print("  -> Bypass clients:", ", ".join(c["client_ip"] for c in report_b))
 
